@@ -15,8 +15,7 @@ app = Flask('')
 
 @app.route('/')
 def home():
-    main_port = os.getenv("PORT", "3000")
-    return f"Bot is Alive and Running Live 24/7 on Port {main_port}!"
+    return "Bot is Live and Running 24/7 in VC & Web!"
 
 def run_web():
     port = int(os.getenv("PORT", 3000))
@@ -29,12 +28,13 @@ def keep_alive():
 
 keep_alive()
 
-# Discord Bot Setup (help_command=None added to fix the crash)
+# Discord Bot Setup
 intents = discord.Intents.default()
 intents.message_content = True
 intents.guilds = True
 intents.members = True
 intents.dm_messages = True
+intents.voice_states = True  # VC ke liye zaroori hai
 
 bot = commands.Bot(command_prefix=".", intents=intents, help_command=None)
 
@@ -58,13 +58,17 @@ def save_db(data):
 async def on_ready():
     print(f"[BOT] Logged in as {bot.user.tag}!")
     await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="ADVANCED SOON FEAUTURES | .help"))
+    
+    # Instant Slash Command Sync
     try:
-        synced = await bot.tree.sync()
-        print(f"[SLASH] Synced {len(synced)} commands successfully.")
+        for guild in bot.guilds:
+            bot.tree.copy_global_to(guild=guild)
+            await bot.tree.sync(guild=guild)
+        print("[SLASH] Commands synced instantly!")
     except Exception as e:
         print(f"[SLASH ERROR] {e}")
 
-# Autoresponder Listener & Prefix Command Handler
+# Autoresponder & Prefix Handler
 @bot.event
 async def on_message(message):
     if message.author.bot:
@@ -99,17 +103,44 @@ async def on_message(message):
 @bot.command(name="help")
 async def help_cmd(ctx):
     embed = discord.Embed(
-        title="✨ 𝐕𝐈𝐏 𝐌𝐎𝐃𝐄𝐑𝐀𝐓𝐈𝐎𝐍 & 𝐔𝐓𝐈𝐋𝐈𝐓𝐘 𝐇𝐄𝐋𝐏 ✨",
-        description="`⚡` Premium embeds & automated DM notifications enabled.",
+        title="✨ 𝐕𝐈𝐏 𝐌𝐎𝐃𝐄𝐑𝐀𝐓𝐈𝐎𝐍 & 𝐕𝐂 𝐇𝐄𝐋𝐏 ✨",
+        description="`⚡` Premium embeds, Autoresponder & 24/7 VC features enabled.",
         color=0x2b2d31
     )
-    embed.add_field(name="🛡️ Moderation Actions", value="`.ban @user [reason]`\n`.kick @user [reason]`", inline=False)
-    embed.add_field(name="💬 Direct Messaging", value="`.dm @user [message]`", inline=False)
-    embed.add_field(name="🤖 Slash Features", value="Use `/to`, `/dm`, and `/autoresponse` for rich interactive menus.", inline=False)
+    embed.add_field(name="🔊 Voice Commands", value="`.join` - Bot joins your VC\n`.leave` - Bot leaves VC", inline=False)
+    embed.add_field(name="🛡️ Moderation", value="`.ban @user [reason]`\n` /to @user [reason] `", inline=False)
+    embed.add_field(name="💬 Messaging", value="`.dm @user [message]`\n` /dm @user [title] [msg] `", inline=False)
+    embed.add_field(name="🤖 Autoresponder", value="` /autoresponse add `\n` /autoresponse list `\n` /autoresponse delete `", inline=False)
     embed.set_footer(text="ADVANCED SOON FEAUTURES | .help")
     await ctx.reply(embed=embed)
 
-# 2. .dm @user [msg]
+# 2. .join (VC Join & 24/7 Stay)
+@bot.command(name="join")
+async def join_vc(ctx):
+    if not ctx.author.voice or not ctx.author.voice.channel:
+        return await ctx.reply("❌ Pehle kisi Voice Channel (VC) me jaao bhai!")
+    
+    channel = ctx.author.voice.channel
+    if ctx.voice_client:
+        await ctx.voice_client.move_to(channel)
+        return await ctx.reply(f"✅ Bot successfully moved to **{channel.name}**!")
+    
+    try:
+        await channel.connect()
+        await ctx.reply(f"🔊 Successfully joined **{channel.name}** and ready for 24/7 vibe!")
+    except Exception as e:
+        await ctx.reply(f"❌ VC join karne me error aayi: {e}")
+
+# 3. .leave (VC Leave)
+@bot.command(name="leave")
+async def leave_vc(ctx):
+    if ctx.voice_client:
+        await ctx.voice_client.disconnect()
+        await ctx.reply("👋 Bot disconnected from Voice Channel.")
+    else:
+        await ctx.reply("⚠️ Bot kisi VC me connected nahi hai!")
+
+# 4. .dm @user [msg]
 @bot.command(name="dm")
 @commands.has_permissions(manage_messages=True)
 async def prefix_dm(ctx, member: discord.Member = None, *, text: str = None):
@@ -123,13 +154,12 @@ async def prefix_dm(ctx, member: discord.Member = None, *, text: str = None):
         )
         embed.add_field(name="👤 Sender", value=str(ctx.author))
         embed.add_field(name="🏰 Server", value=ctx.guild.name)
-        embed.set_footer(text="⚡ Secure DM Dispatcher")
         await member.send(embed=embed)
         await ctx.reply(f"✅ Successfully sent DM to **{member.tag}**.")
     except Exception:
-        await ctx.reply("❌ Could not send DM to this user (DMs might be closed).")
+        await ctx.reply("❌ Could not send DM to this user (DMs closed).")
 
-# 3. .ban @user [reason]
+# 5. .ban @user [reason]
 @bot.command(name="ban")
 @commands.has_permissions(ban_members=True)
 async def prefix_ban(ctx, member: discord.Member = None, *, reason: str = "No reason provided"):
@@ -176,7 +206,7 @@ async def slash_to(interaction: discord.Interaction, user: discord.Member, reaso
 
     try:
         await user.send(embed=dm_embed)
-        await interaction.response.send_message(f"✅ Action logged and DM successfully dispatched to **{user.tag}** with reason!", ephemeral=True)
+        await interaction.response.send_message(f"✅ Action logged and DM successfully dispatched to **{user.tag}**!", ephemeral=True)
     except Exception:
         await interaction.response.send_message(f"⚠️ Action processed, but could not send DM to **{user.tag}** (DMs closed).", ephemeral=True)
 
