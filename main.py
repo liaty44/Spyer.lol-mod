@@ -1,5 +1,6 @@
 import os
 import time
+import datetime
 import discord
 from discord.ext import commands
 from dotenv import load_dotenv
@@ -14,7 +15,7 @@ app = Flask('')
 
 @app.route('/')
 def home():
-    return "Bot is Live and Running 24/7!"
+    return "Spike.lol Bot is Live and Running 24/7!"
 
 def run_web():
     port = int(os.getenv("PORT", 3000))
@@ -44,7 +45,11 @@ help_cooldowns = {}
 @bot.event
 async def on_ready():
     print(f"[BOT] Logged in as {bot.user.tag} successfully!")
-    await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="ADVANCED SECURITY | .helps"))
+    # Set status to DND and Custom Activity watching .gg/Spike.lol | .helps
+    await bot.change_presence(
+        status=discord.Status.dnd,
+        activity=discord.Activity(type=discord.ActivityType.watching, name=".gg/Spike.lol | .helps")
+    )
 
 # Snipe tracker (Store deleted messages for 24 hours)
 @bot.event
@@ -64,15 +69,14 @@ async def on_message_delete(message):
     current_time = time.time()
     snipe_storage[guild_id] = [m for m in snipe_storage[guild_id] if current_time - m["time"] < 86400][:20]
 
-# Message Listener (Ticket help trigger with 10m cooldown & Prefix processing)
+# Message Listener (Ticket help trigger with 10m cooldown)
 @bot.event
 async def on_message(message):
     if message.author.bot:
         return
 
-    # Auto help response if someone types 'help' without prefix (10m cooldown)
     content_lower = message.content.lower()
-    if content_lower == "help" or ( "help" in content_lower and not message.content.startswith('.') ):
+    if content_lower == "help" or ("help" in content_lower and not message.content.startswith('.')):
         guild_id = message.guild.id if message.guild else "dm"
         user_id = message.author.id
         cooldown_key = f"{guild_id}-{user_id}"
@@ -81,11 +85,11 @@ async def on_message(message):
         if cooldown_key not in help_cooldowns or current_time - help_cooldowns[cooldown_key] >= 600:
             help_cooldowns[cooldown_key] = current_time
             embed = discord.Embed(
-                title="✨ **VIP SUPPORT TICKET DESK** ✨",
+                title="✨ **SPIKE.LOL SUPPORT TICKET DESK** ✨",
                 description="> **Need assistance?** Our staff team is ready to help you!\n\n📌 **Status:** Ticket System Active\n🔒 **Security:** Fully Encrypted & Secure",
                 color=0x2b2d31
             )
-            embed.set_footer(text="⚡ Protected by Advanced Security | Cooldown: 10m")
+            embed.set_footer(text="⚡ Powered by Spike.lol | Cooldown: 10m")
             try:
                 await message.reply(embed=embed)
             except Exception:
@@ -97,13 +101,13 @@ async def on_message(message):
 @bot.command(name="helps")
 async def helps_cmd(ctx):
     embed = discord.Embed(
-        title="🔥 **✨ 𝐕𝐈𝐏 𝐌𝐎𝐃𝐄𝐑𝐀𝐓𝐈𝐎𝐍 & 𝐔𝐓𝐈𝐋𝐈𝐓𝐘 𝐇𝐄𝐋𝐏 ✨** 🔥",
+        title="🔥 **✨ SPIKE.LOL MODERATION & UTILITY HELP ✨** 🔥",
         description="> *Experience elite performance with premium styling & instant action logs.*\n",
         color=0x2b2d31
     )
     embed.add_field(
         name="🛡️ **Moderation & Actions**", 
-        value="`•` `.ban @user [reason]` - Ban user & send DM alert\n`•` `.w @user [reason]` - Issue formal warning & DM notice\n`•` `.dm @user Title | Message` - Send custom premium embed DM", 
+        value="`•` `.ban @user [reason]` - Ban user & send DM alert\n`•` `.to @user [reason]` - Timeout user for 30m & send DM notice\n`•` `.w @user [reason]` - Issue formal warning & DM notice\n`•` `.dm @user Title | Message` - Send custom premium embed DM", 
         inline=False
     )
     embed.add_field(
@@ -111,7 +115,7 @@ async def helps_cmd(ctx):
         value="`•` `.join` - Connect bot to your Voice Channel (24/7)\n`•` `.leave` - Disconnect bot from VC\n`•` `.snipe` - View deleted messages from last 24h", 
         inline=False
     )
-    embed.set_footer(text="ADVANCED SECURITY | Type .helps for menu")
+    embed.set_footer(text="Spike.lol Security | Type .helps for menu")
     await ctx.reply(embed=embed)
 
 # 2. .dm @user Title | Message
@@ -132,15 +136,49 @@ async def prefix_dm(ctx, member: discord.Member = None, *, content: str = None):
     )
     embed.add_field(name="👤 Sender", value=str(ctx.author), inline=True)
     embed.add_field(name="🏠 Server", value=ctx.guild.name, inline=True)
-    embed.set_footer(text="⚡ Secure VIP Dispatcher")
+    embed.set_footer(text="⚡ Spike.lol Secure Dispatcher")
 
     try:
         await member.send(embed=embed)
         await ctx.reply(f"✅ Successfully dispatched DM embed to **{member.tag}**!")
     except Exception:
-        await ctx.reply(f"⚠️ Could not send DM to **{member.tag}** (User DMs are closed).")
+        await ctx.reply(f"⚠️ Could not send DM to **{member.tag}** (User DMs are closed, but action is logged).")
 
-# 3. .w @user [reason] (Warn System)
+# 3. .to @user [reason] (Timeout System - 30 mins)
+@bot.command(name="to")
+@commands.has_permissions(moderate_members=True)
+async def prefix_to(ctx, member: discord.Member = None, *, reason: str = "No reason provided"):
+    if not member:
+        return await ctx.reply("❌ **Usage:** `.to @user [reason]`")
+    
+    dm_embed = discord.Embed(
+        title="⚠️ **YOU HAVE BEEN TIMED OUT**",
+        description="> *You have received a 30-minute timeout in the server.*",
+        color=0xffaa00
+    )
+    dm_embed.add_field(name="🏠 Server", value=ctx.guild.name, inline=False)
+    dm_embed.add_field(name="🛡️ Action By", value=str(ctx.author), inline=False)
+    dm_embed.add_field(name="📄 Reason", value=reason, inline=False)
+    dm_embed.set_footer(text="⚡ Spike.lol Moderation System")
+
+    try:
+        await member.send(embed=dm_embed)
+    except Exception:
+        pass
+
+    try:
+        duration = datetime.timedelta(minutes=30)
+        await member.timeout(duration, reason=reason)
+        success_embed = discord.Embed(
+            title="✅ **Action Success: Timeout**",
+            description=f"Successfully timed out **{member.tag}** for 30 minutes and dispatched DM notification.",
+            color=0x00ff00
+        )
+        await ctx.reply(embed=success_embed)
+    except Exception as e:
+        await ctx.reply(f"❌ Failed to apply timeout. Error: {e}")
+
+# 4. .w @user [reason] (Warn System)
 @bot.command(name="w")
 @commands.has_permissions(manage_messages=True)
 async def prefix_warn(ctx, member: discord.Member = None, *, reason: str = "No reason specified"):
@@ -155,7 +193,7 @@ async def prefix_warn(ctx, member: discord.Member = None, *, reason: str = "No r
     dm_embed.add_field(name="🏠 Server", value=ctx.guild.name, inline=False)
     dm_embed.add_field(name="🛡️ Warned By", value=str(ctx.author), inline=False)
     dm_embed.add_field(name="📄 Reason", value=reason, inline=False)
-    dm_embed.set_footer(text="⚡ Official Moderation Warning")
+    dm_embed.set_footer(text="⚡ Spike.lol Official Warning")
 
     try:
         await member.send(embed=dm_embed)
@@ -169,7 +207,7 @@ async def prefix_warn(ctx, member: discord.Member = None, *, reason: str = "No r
     )
     await ctx.reply(embed=success_embed)
 
-# 4. .ban @user [reason]
+# 5. .ban @user [reason]
 @bot.command(name="ban")
 @commands.has_permissions(ban_members=True)
 async def prefix_ban(ctx, member: discord.Member = None, *, reason: str = "No reason provided"):
@@ -183,6 +221,7 @@ async def prefix_ban(ctx, member: discord.Member = None, *, reason: str = "No re
     dm_embed.add_field(name="🏠 Server", value=ctx.guild.name, inline=False)
     dm_embed.add_field(name="🛡️ Action By", value=str(ctx.author), inline=False)
     dm_embed.add_field(name="📄 Reason", value=reason, inline=False)
+    dm_embed.set_footer(text="⚡ Spike.lol Ban System")
     
     try:
         await member.send(embed=dm_embed)
@@ -200,7 +239,7 @@ async def prefix_ban(ctx, member: discord.Member = None, *, reason: str = "No re
     except Exception:
         await ctx.reply("❌ Failed to execute ban action.")
 
-# 5. .snipe (Last 24h deleted messages)
+# 6. .snipe (Last 24h deleted messages)
 @bot.command(name="snipe")
 @commands.has_permissions(manage_messages=True)
 async def prefix_snipe(ctx):
@@ -219,10 +258,10 @@ async def prefix_snipe(ctx):
         description=description,
         color=0x2b2d31
     )
-    embed.set_footer(text=f"Showing latest {min(len(messages), 10)} deleted messages")
+    embed.set_footer(text=f"Showing latest {min(len(messages), 10)} deleted messages | Spike.lol")
     await ctx.reply(embed=embed)
 
-# 6. .join (VC Join)
+# 7. .join (VC Join)
 @bot.command(name="join")
 async def join_vc(ctx):
     if not ctx.author.voice or not ctx.author.voice.channel:
@@ -239,7 +278,7 @@ async def join_vc(ctx):
     except Exception as e:
         await ctx.reply(f"❌ Error joining VC: {e}")
 
-# 7. .leave (VC Leave)
+# 8. .leave (VC Leave)
 @bot.command(name="leave")
 async def leave_vc(ctx):
     if ctx.voice_client:
