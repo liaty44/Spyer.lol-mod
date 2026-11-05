@@ -29,14 +29,14 @@ def keep_alive():
 
 keep_alive()
 
-# Discord Bot Setup
+# Discord Bot Setup (help_command=None added to fix the crash)
 intents = discord.Intents.default()
 intents.message_content = True
 intents.guilds = True
 intents.members = True
 intents.dm_messages = True
 
-bot = commands.Bot(command_prefix=".", intents=intents)
+bot = commands.Bot(command_prefix=".", intents=intents, help_command=None)
 
 # Database Setup for Autoresponder
 DB_FILE = "src/database.json"
